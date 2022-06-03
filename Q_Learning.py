@@ -95,6 +95,7 @@ class Q_Learning:
         total_epochs, total_points = 0, 0
         for _ in range(evaluations_number):
             state = self.env.reset()
+            print(state, self.q_table[state])
             epochs, points = 0, 0
             done = False
             while not done:
