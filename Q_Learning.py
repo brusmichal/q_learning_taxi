@@ -15,19 +15,19 @@ class Q_Learning:
         self.min_epsilon = 0.01
         self.max_epsilon = 1
         self.decay = 0.01
-        self.epochs_limit = epochs_limit
+        self.learning_epochs_limit = epochs_limit
 
         self.q_table = np.zeros([self.env.observation_space.n, self.env.action_space.n])
-        self.penalties_during_learning = []
+        self.points_during_learning = []
 
     def learn(self):
         rng = np.random.default_rng()
-        for i in range(self.epochs_limit):
+        for i in range(self.learning_epochs_limit):
             # initialize
             state = self.env.reset()
             done = False
 
-            penalties = 0
+            points = 0
             while not done:
                 # choose an action
                 if rng.uniform(0, 1) < self.epsilon:
@@ -36,7 +36,7 @@ class Q_Learning:
                     action = np.argmax(self.q_table[state])
                 # make new step
                 next_state, reward, done, info = self.env.step(action)
-                penalties += reward
+                points += reward
                 # update q_table
                 old_q = self.q_table[state, action]
                 next_max_q = np.max(self.q_table[next_state])
@@ -45,30 +45,37 @@ class Q_Learning:
                 state = next_state
             # exploration factor decreases with time
             self.update_epsilon(i)
-            self.penalties_during_learning.append(penalties)
+            self.points_during_learning.append(points)
         print("Training finished.\n")
 
     def plot_learning_process(self):
-        x = range(self.epochs_limit)
-        plt.plot(x, self.penalties_during_learning)
+        x = range(self.learning_epochs_limit)
+        plt.figure(figsize=(30, 10))
+        plt.plot(x, self.points_during_learning)
+        plt.ylim(-500, 50)
         plt.xlabel('Epoch')
-        plt.ylabel('Training total penalties')
-        plt.title('Total penalties over all epochs in training')
+        plt.ylabel('Training total points')
+        plt.title('Total points over all epochs in training')
+        plt.grid(visible=True)
         plt.show()
 
     def plot_epsilons(self):
+        plt.figure(figsize=(30, 10))
         plt.plot(self.epsilons_history)
         plt.xlabel('Epoch')
         plt.ylabel('Epsilon')
         plt.title("Epsilon for epoch")
+        plt.grid(visible=True)
         plt.show()
 
-    def show_map(self, start_point, with_training):
+    def show_map(self, start_point, max_step_limit, with_training):
         state = self.env.encode(start_point[0], start_point[1], start_point[2], start_point[3])
         self.env.s = state
+        self.env.render()
         frames = []
         done = False
-        while not done:
+        moves_limit = 0
+        while not (done or moves_limit == max_step_limit):
             if with_training:
                 action = np.argmax(self.q_table[state])
             else:
@@ -76,18 +83,19 @@ class Q_Learning:
 
             state, reward, done, info = self.env.step(action)
             frames.append({
-                'frame': self.env.render(mode='human'),
+                'frame': self.env.render(mode='ansi'),
                 'state': state,
                 'action': action,
                 'reward': reward
             })
-        print(frames)
+            moves_limit += 1
+        self.print_frames(frames)
 
     def evaluate(self, evaluations_number, with_training):
-        total_epochs, total_penalties = 0, 0
+        total_epochs, total_points = 0, 0
         for _ in range(evaluations_number):
             state = self.env.reset()
-            epochs, penalties = 0, 0
+            epochs, points = 0, 0
             done = False
             while not done:
                 if with_training:
@@ -97,24 +105,24 @@ class Q_Learning:
 
                 state, reward, done, info = self.env.step(action)
                 epochs += 1
-                penalties += reward
+                points += reward
 
             total_epochs += epochs
-            total_penalties += penalties
+            total_points += points
 
         print(f"After {evaluations_number} evaluations:")
-        print(f"Average time to finish: {total_epochs / evaluations_number}")
-        print(f"Average penalty per epoch: {total_penalties / evaluations_number}")
+        print(f"Average time steps to finish: {int(total_epochs / evaluations_number)}")
+        print(f"Average points per epoch: {int(total_points / evaluations_number)}")
 
     def print_frames(self, frames):
         for i, frame in enumerate(frames):
             clear_output(wait=True)
-            print(frame['frame'].getvalue())
+            print(frame['frame'])
             print(f"Timestep: {i + 1}")
             print(f"State: {frame['state']}")
             print(f"Action: {frame['action']}")
             print(f"Reward: {frame['reward']}")
-            sleep(.1)
+            sleep(.5)
 
     def update_epsilon(self, episode):
         self.epsilon = self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(-self.decay * episode)
